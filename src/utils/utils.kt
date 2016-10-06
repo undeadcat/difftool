@@ -1,5 +1,6 @@
 package utils
 
+import java.awt.GridBagConstraints
 import java.io.FileInputStream
 import java.io.InputStreamReader
 import java.util.*
@@ -43,4 +44,10 @@ fun readFile(file: String): List<String> {
     } finally {
         stream.close()
     }
+}
+
+fun getGridBagConstraints(configure: (GridBagConstraints) -> Unit): GridBagConstraints {
+    val result = GridBagConstraints()
+    configure(result)
+    return result
 }

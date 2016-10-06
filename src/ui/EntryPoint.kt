@@ -3,10 +3,9 @@ package ui
 import diff.ChangesBuilder
 import diff.DiffItem
 import diff.PatienceDiffAlgorithm
+import utils.getGridBagConstraints
 import utils.parseIntOrNull
-import java.awt.Dimension
-import java.awt.EventQueue
-import java.awt.Frame
+import java.awt.*
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -56,47 +55,51 @@ class EntryPoint(newUiConfig: UiConfig) : JFrame() {
         })
     }
 
-    private fun initUi(uiConfig: UiConfig) {
+    private fun initUi(newConfig: UiConfig) {
         title = "DiffTool"
         setLocationRelativeTo(null)
         defaultCloseOperation = EXIT_ON_CLOSE
         extendedState = Frame.MAXIMIZED_BOTH
 
-        leftSide.scrollPane.preferredSize = Dimension(contentPane.width / 2, contentPane.height)
-        rightSide.scrollPane.preferredSize = Dimension(contentPane.width / 2, contentPane.height)
         leftSide.scrollPane.horizontalScrollBar.model = rightSide.scrollPane.horizontalScrollBar.model
         leftSide.scrollPane.verticalScrollBar.model = rightSide.scrollPane.verticalScrollBar.model
 
-        val toolbar = CreateToolbar(uiConfig)
-        val leftFileNameView = FileNameView(uiConfig.leftFileName, { file ->
-            updateView(uiConfig.copy(leftFileName = file))
+        val toolbar = CreateToolbar(newConfig)
+        val leftFileInput = FileInput(newConfig.leftFileName, { file ->
+            updateView(this.uiConfig.copy(leftFileName = file))
         })
-        val rightFileNameView = FileNameView(uiConfig.rightFileName, { file ->
-            updateView(uiConfig.copy(rightFileName = file))
+        val rightFileInput = FileInput(newConfig.rightFileName, { file ->
+            updateView(this.uiConfig.copy(rightFileName = file))
         })
 
-        val groupLayout = GroupLayout(contentPane)
-        contentPane.layout = groupLayout
-        groupLayout.autoCreateGaps = true
-
-        groupLayout.setVerticalGroup(
-                groupLayout.createSequentialGroup()
-                        .addComponent(toolbar)
-                        .addGroup(groupLayout.createParallelGroup()
-                                .addComponent(leftFileNameView.label)
-                                .addComponent(rightFileNameView.label))
-                        .addGroup(groupLayout.createParallelGroup()
-                                .addComponent(leftSide.scrollPane)
-                                .addComponent(rightSide.scrollPane)))
-        groupLayout.setHorizontalGroup(groupLayout
-                .createParallelGroup(GroupLayout.Alignment.LEADING)
-                .addComponent(toolbar)
-                .addGroup(groupLayout.createSequentialGroup()
-                        .addComponent(leftFileNameView.label, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Int.MAX_VALUE)
-                        .addComponent(rightFileNameView.label, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Int.MAX_VALUE))
-                .addGroup(groupLayout.createSequentialGroup()
-                        .addComponent(leftSide.scrollPane)
-                        .addComponent(rightSide.scrollPane)))
+        contentPane.layout = GridBagLayout()
+        contentPane.add(toolbar, getGridBagConstraints {
+            it.fill = GridBagConstraints.HORIZONTAL
+            it.gridwidth = 2
+            it.gridy = 0
+        })
+        contentPane.add(leftFileInput.panel, getGridBagConstraints {
+            it.fill = GridBagConstraints.HORIZONTAL
+            it.weightx = 0.5
+            it.gridy = 1
+        })
+        contentPane.add(rightFileInput.panel, getGridBagConstraints {
+            it.fill = GridBagConstraints.HORIZONTAL
+            it.weightx = 0.5
+            it.gridy = 1
+        })
+        contentPane.add(leftSide.scrollPane, getGridBagConstraints {
+            it.fill = GridBagConstraints.BOTH
+            it.weightx = 0.5
+            it.weighty = 0.9
+            it.gridy = 2
+        })
+        contentPane.add(rightSide.scrollPane, getGridBagConstraints {
+            it.fill = GridBagConstraints.BOTH
+            it.weightx = 0.5
+            it.weighty = 0.9
+            it.gridy = 2
+        })
 
         pack()
     }
@@ -122,9 +125,10 @@ class EntryPoint(newUiConfig: UiConfig) : JFrame() {
             leftSide.selectPreviousChange()
         }
         toolbar.add(prevChangeButton)
+        toolbar.add(Box.createHorizontalStrut(10))
         toolbar.add(nextChangeButton)
+        toolbar.add(Box.createHorizontalStrut(10))
 
-        val contextPanel = JPanel()
         val contextLabel = JLabel("Context size:")
         val contextItems = arrayOf(ComboboxItem(null, "Unlimited"),
                 ComboboxItem(1),
@@ -138,20 +142,19 @@ class EntryPoint(newUiConfig: UiConfig) : JFrame() {
                 else contextItems.first({ it.value != null && contextLimit > it.value }).value,
                 {
                     newValue ->
-                    updateView(uiConfig.copy(contextLimit = newValue))
+                    updateView(this.uiConfig.copy(contextLimit = newValue))
                 })
-        contextPanel.add(contextLabel)
-        contextPanel.add(contextCombobox)
         val modeItems = arrayOf(
                 ComboboxItem(false, "Show diff lines"),
                 ComboboxItem(true, "Show diff words"))
         val diffModeButtonCombobox = CreateCombobox(modeItems,
                 uiConfig.diffWords,
                 { newValue ->
-                    updateView(uiConfig.copy(diffWords = newValue))
+                    updateView(this.uiConfig.copy(diffWords = newValue))
                 })
         toolbar.add(contextLabel)
         toolbar.add(contextCombobox)
+        toolbar.add(Box.createHorizontalStrut(10))
         toolbar.add(diffModeButtonCombobox)
         return toolbar
     }
