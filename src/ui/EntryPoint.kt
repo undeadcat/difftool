@@ -12,8 +12,9 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import javax.swing.*
 
-class EntryPoint(var uiConfig: UiConfig) : JFrame() {
+class EntryPoint(newUiConfig: UiConfig) : JFrame() {
 
+    var uiConfig = UiConfig(null, null)
     val leftSide = FileContentPane()
     val rightSide = FileContentPane()
     val changesBuilder = ChangesBuilder()
@@ -22,8 +23,8 @@ class EntryPoint(var uiConfig: UiConfig) : JFrame() {
     val backgroundExecutor: ExecutorService = Executors.newFixedThreadPool(1)
 
     init {
-        initUi()
-        updateView(uiConfig)
+        initUi(newUiConfig)
+        updateView(newUiConfig)
     }
 
     private fun updateView(newConfig: UiConfig) {
@@ -33,8 +34,8 @@ class EntryPoint(var uiConfig: UiConfig) : JFrame() {
             val previousRightFile = uiConfig.rightFileName
 
             uiConfig = newConfig
-            val theLeftFileName = uiConfig.leftFileName
-            val theRightFileName = uiConfig.rightFileName
+            val theLeftFileName = newConfig.leftFileName
+            val theRightFileName = newConfig.rightFileName
             try {
 
                 if (theLeftFileName != previousLeftFile || theRightFileName != previousRightFile) {
@@ -43,20 +44,19 @@ class EntryPoint(var uiConfig: UiConfig) : JFrame() {
                     changes = changesBuilder.build(leftFile, rightFile, diffAlgorithm.getMatches(leftFile, rightFile))
                 }
 
-                val viewModel = ViewModelBuilder(uiConfig.diffWords, uiConfig.contextLimit).build(changes)
+                val viewModel = ViewModelBuilder(newConfig.diffWords, newConfig.contextLimit).build(changes)
 
                 EventQueue.invokeLater { setModel(viewModel) }
             } catch (e: Exception) {
                 print("Exception building diff between [$theLeftFileName] and [$theRightFileName]: ")
                 e.printStackTrace()
             }
-            val endTime = System.nanoTime();
-            println("Built diff in ${(endTime - startTime)/1000000} ms")
-
+            val endTime = System.nanoTime()
+            println("Built diff in ${(endTime - startTime) / 1000000} ms")
         })
     }
 
-    private fun initUi() {
+    private fun initUi(uiConfig: UiConfig) {
         title = "DiffTool"
         setLocationRelativeTo(null)
         defaultCloseOperation = EXIT_ON_CLOSE
@@ -64,10 +64,10 @@ class EntryPoint(var uiConfig: UiConfig) : JFrame() {
 
         leftSide.scrollPane.preferredSize = Dimension(contentPane.width / 2, contentPane.height)
         rightSide.scrollPane.preferredSize = Dimension(contentPane.width / 2, contentPane.height)
-        leftSide.scrollPane.verticalScrollBar.model = rightSide.scrollPane.verticalScrollBar.model
         leftSide.scrollPane.horizontalScrollBar.model = rightSide.scrollPane.horizontalScrollBar.model
+        leftSide.scrollPane.verticalScrollBar.model = rightSide.scrollPane.verticalScrollBar.model
 
-        val toolbar = CreateToolbar()
+        val toolbar = CreateToolbar(uiConfig)
         val leftFileNameView = FileNameView(uiConfig.leftFileName, { file ->
             updateView(uiConfig.copy(leftFileName = file))
         })
@@ -106,18 +106,20 @@ class EntryPoint(var uiConfig: UiConfig) : JFrame() {
         rightSide.setContent(viewModel.right)
     }
 
-    private fun CreateToolbar(): JToolBar {
+    private fun CreateToolbar(uiConfig: UiConfig): JToolBar {
         val toolbar = JToolBar()
         toolbar.isFloatable = false
         toolbar.isRollover = false
         toolbar.isBorderPainted = false
         val nextChangeButton = JButton("next")
         nextChangeButton.addActionListener { i ->
-            leftSide.scrollToNextChange()
+            rightSide.selectNextChange()
+            leftSide.selectNextChange()
         }
         val prevChangeButton = JButton("prev")
         prevChangeButton.addActionListener { i ->
-            leftSide.scrollToPreviousChange()
+            rightSide.selectPreviousChange()
+            leftSide.selectPreviousChange()
         }
         toolbar.add(prevChangeButton)
         toolbar.add(nextChangeButton)
