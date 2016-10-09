@@ -59,19 +59,21 @@ class ViewModelBuilderTest {
         Assert.assertNotNull(changedBlockLeft)
         Assert.assertNotNull(changedBlockRight)
 
-        Assert.assertThat(changedBlockLeft, Is.`is`(listOf(
-                BlockModel(BlockType.Deleted, "word1"),
-                BlockModel(BlockType.Matching, " word2\nword3 "),
-                BlockModel(BlockType.Deleted, "deletedWord"),
-                BlockModel(BlockType.Matching, "\n")
+        val leftWords = changedBlockLeft!!.map { Pair(it.type, it.getContentString()) }
+        Assert.assertThat(leftWords, Is.`is`(listOf(
+                Pair(BlockType.Deleted, "word1"),
+                Pair(BlockType.Matching, " word2\nword3 "),
+                Pair(BlockType.Deleted, "deletedWord"),
+                Pair(BlockType.Matching, "\n")
         )))
 
+        val rightWords = changedBlockRight!!.map { Pair(it.type, it.getContentString()) }
 
-        Assert.assertThat(changedBlockRight, Is.`is`(listOf(
-                BlockModel(BlockType.Added, "changedWord"),
-                BlockModel(BlockType.Matching, " word2\nword3 "),
-                BlockModel(BlockType.Added, "addedWord"),
-                BlockModel(BlockType.Matching, "\n")
+        Assert.assertThat(rightWords, Is.`is`(listOf(
+                Pair(BlockType.Added, "changedWord"),
+                Pair(BlockType.Matching, " word2\nword3 "),
+                Pair(BlockType.Added, "addedWord"),
+                Pair(BlockType.Matching, "\n")
         )))
 
     }
@@ -83,7 +85,7 @@ class ViewModelBuilderTest {
         return ViewModelBuilder(diffWords, contextLimit).build(diffItems)
     }
 
-    private fun lines(vararg lines: String): String {
-        return lines.joinToString("\n") + "\n"
+    private fun lines(vararg lines: String): List<String> {
+        return lines.toList()
     }
 }

@@ -32,10 +32,10 @@ class ViewModelBuilder(private val diffWords: Boolean = false, private val conte
                     val wordsDiff = if (deletions.size > 0 && additions.size > 0 && diffWords)
                         getWordBlocks(deletedContent, addedContent)
                     else Pair(null, null)
-                    left.add(BlockModel(BlockType.Deleted, deletedContent,
+                    left.add(BlockModel(BlockType.Deleted, deletions, "\n",
                             children = wordsDiff.first,
                             padding = if (deletions.size < additions.size) paddingBlock else null))
-                    right.add(BlockModel(BlockType.Added, addedContent,
+                    right.add(BlockModel(BlockType.Added, additions, "\n",
                             children = wordsDiff.second,
                             padding = if (additions.size < deletions.size) paddingBlock else null))
                 }
@@ -50,14 +50,14 @@ class ViewModelBuilder(private val diffWords: Boolean = false, private val conte
         val diffItems = changesBuilder.build(leftWords, rightWords, diffAlgorithm.getMatches(leftWords, rightWords))
         val leftWordBlocks = diffItems.map {
             when (it) {
-                is DiffItem.Changed -> BlockModel(BlockType.Deleted, it.deletions.joinToString(""))
-                is DiffItem.Matched -> BlockModel(BlockType.Matching, it.content.joinToString(""))
+                is DiffItem.Changed -> BlockModel(BlockType.Deleted, it.deletions, "")
+                is DiffItem.Matched -> BlockModel(BlockType.Matching, it.content, "")
             }
         }
         val rightWordBlocks = diffItems.map {
             when (it) {
-                is DiffItem.Changed -> BlockModel(BlockType.Added, it.additions.joinToString(""))
-                is DiffItem.Matched -> BlockModel(BlockType.Matching, it.content.joinToString(""))
+                is DiffItem.Changed -> BlockModel(BlockType.Added, it.additions, "")
+                is DiffItem.Matched -> BlockModel(BlockType.Matching, it.content, "")
             }
         }
         return Pair(leftWordBlocks, rightWordBlocks)
@@ -83,7 +83,7 @@ class ViewModelBuilder(private val diffWords: Boolean = false, private val conte
     }
 
     private fun blockFromLines(type: BlockType, lines: List<String>): BlockModel {
-        return BlockModel(type, toContent(lines))
+        return BlockModel(type, lines, "\n")
     }
 
     private fun toContent(lines: List<String>): String {
@@ -91,4 +91,5 @@ class ViewModelBuilder(private val diffWords: Boolean = false, private val conte
             return ""
         return lines.joinToString("\n") + "\n"
     }
+
 }

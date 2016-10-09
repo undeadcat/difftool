@@ -88,6 +88,8 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
         defaultCloseOperation = EXIT_ON_CLOSE
         extendedState = Frame.MAXIMIZED_BOTH
 
+        leftSide.setLineSelectedListener { rightSide.selectByLineNumber(it) }
+        rightSide.setLineSelectedListener { leftSide.selectByLineNumber(it) }
         leftSide.scrollPane.horizontalScrollBar.model = rightSide.scrollPane.horizontalScrollBar.model
         leftSide.scrollPane.verticalScrollBar.model = rightSide.scrollPane.verticalScrollBar.model
 

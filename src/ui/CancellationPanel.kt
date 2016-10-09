@@ -24,7 +24,6 @@ class CancellationPanel : JPanel(FlowLayout(FlowLayout.TRAILING, 5, 0)) {
                     future.cancel(true)
                 }
             })
-
             isVisible = false
         }
         add(cancelButton)
@@ -35,7 +34,5 @@ class CancellationPanel : JPanel(FlowLayout(FlowLayout.TRAILING, 5, 0)) {
         synchronized(this, {
             registeredFutures.add(future)
         })
-
     }
-
 }

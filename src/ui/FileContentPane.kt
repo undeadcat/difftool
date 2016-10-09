@@ -5,18 +5,27 @@ import java.awt.Graphics2D
 import java.awt.Rectangle
 import javax.swing.JScrollPane
 import javax.swing.JTextPane
+import javax.swing.event.CaretListener
 import javax.swing.text.*
 
-class FileContentPane {
-
+class FileContentPane() {
+    private var lineSelected: (Int) -> Unit = {}
     private var selectedHighlightTag: Any? = null
     private val textPane = JTextPane()
-    private var selectedSpan: TextSpan? = null
-    private var changeOffsets = arrayListOf<TextSpan>()
     val scrollPane = JScrollPane(textPane)
+    private var selectionModel: SelectionModel = SelectionModel(emptyList())
+    private val lineSelectionHandler = CaretListener({
+        val lineNumber = selectionModel.getLineNumberByOffset(it.dot)
+        val span = selectionModel.selectByLineNumber(lineNumber)
+        highlightSelectedSpan(span)
+        lineSelected(lineNumber)
+    })
 
     init {
         textPane.isEditable = false
+        textPane.caret = DefaultCaret().apply {
+            updatePolicy = DefaultCaret.NEVER_UPDATE
+        }
         textPane.caret.isVisible = true
         textPane.caret.isSelectionVisible = true
         textPane.editorKit = NoWrapEditorKit()
@@ -24,35 +33,29 @@ class FileContentPane {
 
     fun setContent(text: Iterable<BlockModel>) {
         val document = DefaultStyledDocument()
+        textPane.removeCaretListener(lineSelectionHandler)
+        textPane.highlighter.removeAllHighlights()
+        selectionModel = SelectionModel(text)
         val attributes = getDocumentAttributes()
 
+        fun appendBlock(block: BlockModel, getHighlighter: (BlockType) -> Highlighter.HighlightPainter?) {
+            val startOffset = document.length
+            val contentString = block.getContentString()
+            document.insertString(startOffset, contentString, attributes)
+            val highlighter = getHighlighter(block.type)
+            if (highlighter != null)
+                textPane.highlighter.addHighlight(startOffset, startOffset + contentString.length, highlighter)
+        }
+
         fun appendLineBlock(block: BlockModel) {
-            val startOffset = document.length
-            document.insertString(startOffset, block.content, attributes)
-            val highlighter = getLineHighlighter(block.type)
-            if (highlighter != null)
-                textPane.highlighter.addHighlight(startOffset, startOffset + block.content.length, highlighter)
+            appendBlock(block, { getLineHighlighter(it) })
         }
 
-        fun appendWordBlock(block: BlockModel) {
-            val startOffset = document.length
-            document.insertString(startOffset, block.content, attributes)
-            val highlighter = when (block.type) {
-                BlockType.Deleted -> wordDeletedHighlighter
-                BlockType.Added -> wordAddedHighlighter
-                else -> null
-            }
-            if (highlighter != null)
-                textPane.highlighter.addHighlight(startOffset, startOffset + block.content.length, highlighter)
-        }
-
-        changeOffsets = arrayListOf<TextSpan>()
-        textPane.highlighter.removeAllHighlights()
         for (block in text) {
             val blockStartOffset = document.length
             if (block.children != null) {
                 for (child in block.children)
-                    appendWordBlock(child)
+                    appendBlock(child, { getWordHighlighter(it) })
                 val highlighter = getLineHighlighter(block.type)
                 if (highlighter != null)
                     textPane.highlighter.addHighlight(blockStartOffset, document.length, highlighter)
@@ -60,35 +63,46 @@ class FileContentPane {
                 appendLineBlock(block)
             if (block.padding != null)
                 appendLineBlock(block.padding)
-            if (block.type == BlockType.Added || block.type == BlockType.Deleted)
-                changeOffsets.add(TextSpan(blockStartOffset, document.length))
         }
-
         textPane.document = document
+        textPane.addCaretListener(lineSelectionHandler)
+    }
+
+    fun setLineSelectedListener(listener: (Int) -> Unit) {
+        this.lineSelected = listener
     }
 
     fun selectNextChange() {
-        val currentOffset = selectedSpan?.start ?: 0
-        changeSelection(changeOffsets.firstOrNull() { c -> c.start > currentOffset })
+        selectChange(selectionModel.selectNextChange())
     }
 
     fun selectPreviousChange() {
-        val currentOffset = selectedSpan?.start ?: 0
-        changeSelection(changeOffsets.lastOrNull { c -> c.start < currentOffset })
+        selectChange(selectionModel.selectPreviousChange())
     }
 
-    private fun changeSelection(span: TextSpan?) {
+    fun selectByLineNumber(lineNumber: Int) {
+        highlightSelectedSpan(selectionModel.selectByLineNumber(lineNumber))
+    }
+
+    private fun selectChange(span: TextSpan?) {
         if (span == null)
             return
-        val targetY = textPane.modelToView(span.start).y
-        val newY = targetY - textPane.visibleRect.height / 2
-        scrollPane.verticalScrollBar.value = if (newY < 0) 0 else newY
+        scrollToOffset(span.start)
+        highlightSelectedSpan(span)
+    }
+
+    private fun highlightSelectedSpan(span: TextSpan) {
         if (this.selectedHighlightTag != null)
             this.textPane.highlighter.removeHighlight(this.selectedHighlightTag)
         this.selectedHighlightTag = textPane.highlighter.addHighlight(span.start, span.end, selectedHighlighter)
-        selectedSpan = span
 
         this.textPane.repaint()
+    }
+
+    private fun scrollToOffset(offset: Int) {
+        val targetY = textPane.modelToView(offset).y
+        val newY = targetY - textPane.visibleRect.height / 2
+        scrollPane.verticalScrollBar.value = if (newY < 0) 0 else newY
     }
 
     private fun getLineBorderHighlighter(color: Color): Highlighter.HighlightPainter {
@@ -101,11 +115,14 @@ class FileContentPane {
 
     private fun getHighlighter(color: Color, painter: (Graphics2D, Rectangle) -> Unit): Highlighter.HighlightPainter {
         return Highlighter.HighlightPainter(fun(g, p1, p2, @Suppress("UNUSED_PARAMETER") unused, textComponent) {
+            if (p2 > textComponent.document.length)
+                return
             g.color = color
             val startPosition = textComponent.modelToView(p1)
             val endPosition = textComponent.modelToView(p2)
             val rect = Rectangle(startPosition.x, startPosition.y, textComponent.width, endPosition.y - startPosition.y)
             painter(g as Graphics2D, rect)
+
         })
     }
 
@@ -121,6 +138,14 @@ class FileContentPane {
     private val wordDeletedHighlighter = DefaultHighlighter.DefaultHighlightPainter(Color(255, 170, 170))
     private val selectedHighlighter = getLineBorderHighlighter(Color(128, 128, 128))
 
+    private fun getWordHighlighter(type: BlockType): DefaultHighlighter.DefaultHighlightPainter? {
+        return when (type) {
+            BlockType.Deleted -> wordDeletedHighlighter
+            BlockType.Added -> wordAddedHighlighter
+            else -> null
+        }
+    }
+
     private fun getLineHighlighter(type: BlockType): Highlighter.HighlightPainter? {
         when (type) {
 
@@ -131,8 +156,8 @@ class FileContentPane {
             else -> return null
         }
     }
+}
 
-    data private class TextSpan(val start: Int, val end: Int) {
+data class TextSpan(val start: Int, val end: Int) {
 
-    }
 }
