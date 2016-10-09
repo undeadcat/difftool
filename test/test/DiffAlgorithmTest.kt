@@ -89,10 +89,10 @@ void func2() {
 x += 2
 }"""
         val result = getDiff(left, right)
-        Assert.assertThat(result, Is.`is`(listOf(
+        checkEqual(result, listOf(
                 DiffItem.Matched(listOf("void func1() {", "x += 1", "}")),
                 DiffItem.Changed(emptyList(), listOf("void newFunction() {", "println(\"new function\")", "}")),
-                DiffItem.Matched(listOf("void func2() {", "x += 2", "}")))))
+                DiffItem.Matched(listOf("void func2() {", "x += 2", "}"))))
 
     }
 
@@ -115,12 +115,12 @@ x += 2
 void movedFunction() {
 println("moved function")
 }"""
-        Assert.assertThat(getDiff(left, right), Is.`is`(listOf(
+        checkEqual(getDiff(left, right), listOf(
                 DiffItem.Matched(listOf("void func1() {", "x += 1", "}")),
                 DiffItem.Changed(listOf("void movedFunction() {", "println(\"moved function\")", "}"), emptyList()),
                 DiffItem.Matched(listOf("void func2() {", "x += 2", "}")),
                 DiffItem.Changed(emptyList(), listOf("void movedFunction() {", "println(\"moved function\")", "}"))
-        )))
+        ))
     }
 
     @Test fun renameAndAddLines() {
@@ -138,10 +138,10 @@ margin: 0;
 margin: 0;
 color: green;
 }"""
-        Assert.assertThat(getDiff(left, right), Is.`is`(listOf(
+        checkEqual(getDiff(left, right), listOf(
                 DiffItem.Changed(listOf(".foo1 {", "margin: 0;", "}"), emptyList()),
                 DiffItem.Matched(listOf(".bar {", "margin: 0;", "}")),
-                DiffItem.Changed(emptyList(), listOf(".foo1 {", "margin: 0;", "color: green;", "}")))))
+                DiffItem.Changed(emptyList(), listOf(".foo1 {", "margin: 0;", "color: green;", "}"))))
     }
 
     @Test
@@ -149,11 +149,15 @@ color: green;
         val commonNonUnique = listOf("aaa", "aaa", "bbb", "bbb", "ccc", "ccc")
         val left = commonNonUnique.plus("unique")
         val right = listOf("unique").plus(commonNonUnique)
-        Assert.assertThat(getDiff(left, right), Is.`is`(listOf(
+        checkEqual(getDiff(left, right), listOf(
                 DiffItem.Changed(commonNonUnique, emptyList()),
                 DiffItem.Matched(listOf("unique")),
                 DiffItem.Changed(emptyList(), commonNonUnique)
-        )))
+        ))
+    }
+
+    private fun checkEqual(actual: List<DiffItem<String>>, expected: List<DiffItem<String>>) {
+        Assert.assertThat(formatChanges(actual), Is.`is`(formatChanges(expected)))
     }
 
     private fun getDiff(left: String, right: String): List<DiffItem<String>> {

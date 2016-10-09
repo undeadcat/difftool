@@ -2,6 +2,7 @@ package diff
 
 import utils.pairwise
 import utils.sequenceEquals
+import utils.throwIfInterrupted
 import java.util.*
 
 class PatienceDiffAlgorithm() {
@@ -13,6 +14,7 @@ class PatienceDiffAlgorithm() {
         if (left.sequenceEquals(right))
             return left.mapIndexed { i, t -> Match(i, i) }
 
+        Thread.currentThread().throwIfInterrupted()
         val matches = getPatienceMatchesOrEmpty(left, right)
 
         if (matches.isEmpty())

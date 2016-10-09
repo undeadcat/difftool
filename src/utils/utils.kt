@@ -1,8 +1,6 @@
 package utils
 
-import java.awt.GridBagConstraints
 import java.io.FileInputStream
-import java.io.InputStreamReader
 import java.util.*
 
 fun parseCommandLineArgs(args: List<String>): HashMap<String, Any> {
@@ -37,17 +35,52 @@ fun parseIntOrNull(str: String?): Int? {
 }
 
 fun readFile(file: String): List<String> {
-    val stream = InputStreamReader(FileInputStream(file))
+    //check for interruption via Thread.interrupt() manually because
+    //Files.ReadAllText should support interruption (uses nio channels)
+    //but does not because InputStream.read() swallows InterruptedIOException : IOException
+    //:-(
+    val input = FileInputStream(file)
+    val result = StringBuilder()
     try {
-        return stream.readLines()
-
+        val byteBuffer = ByteArray(500000)
+        var read: Int
+        while (true) {
+            Thread.currentThread().throwIfInterrupted()
+            read = input.read(byteBuffer)
+            if (read > 0) {
+                result.append(String(byteBuffer, 0, read))
+            } else break
+        }
     } finally {
-        stream.close()
+        input.close()
     }
+    return result.split("\n", "\r\n")
 }
 
-fun getGridBagConstraints(configure: (GridBagConstraints) -> Unit): GridBagConstraints {
-    val result = GridBagConstraints()
-    configure(result)
+
+fun <T> time(func: () -> T, description: String): T {
+    val startTime = System.nanoTime()
+    val result = func()
+    val endTime = System.nanoTime()
+    println("$description in ${(endTime - startTime) / 1000000} ms")
     return result
+}
+
+fun splitByCount(content: String, maxLength: Int): List<String> {
+    var startIndex = 0
+    val result = arrayListOf<String>()
+    while (startIndex < content.length) {
+        if (startIndex + maxLength <= content.length)
+            result.add(content.substring(startIndex, startIndex + maxLength))
+        else
+            result.add(content.substring(startIndex))
+        startIndex += maxLength
+    }
+    return result
+}
+
+
+fun Thread.throwIfInterrupted() {
+    if (this.isInterrupted)
+        throw InterruptedException()
 }

@@ -1,6 +1,5 @@
 package ui
 
-import utils.getGridBagConstraints
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.event.FocusEvent
@@ -13,29 +12,23 @@ import javax.swing.JFileChooser
 import javax.swing.JPanel
 import javax.swing.JTextField
 
-class FileInput(fileName: String?, val fileChosen: (String) -> Unit) {
+class FileInput(val fileChosen: (String) -> Unit) {
     val panel = JPanel()
-    var currentFileName = fileName
-    private val textInput = JTextField(fileName)
+    private val textInput = JTextField()
     private val button = JButton("Open file")
     private val fileChooser = JFileChooser()
 
     init {
         panel.layout = GridBagLayout()
-        panel.add(textInput, getGridBagConstraints {
-            it.fill = GridBagConstraints.HORIZONTAL
-            it.weightx = 1.0
-            it.gridx = 0
-            it.gridy = 0
-            it.gridwidth = 1
+        panel.add(textInput, GridBagConstraints().apply {
+            this.fill = GridBagConstraints.HORIZONTAL
+            this.weightx = 1.0
         })
 
-        panel.add(button, getGridBagConstraints({
-            it.gridx = 1
-            it.gridwidth = 1
-            it.gridy = 0
-            it.anchor = GridBagConstraints.LINE_END
-        }))
+        panel.add(button, GridBagConstraints().apply {
+            this.gridy = 0
+            this.anchor = GridBagConstraints.LINE_END
+        })
 
         textInput.addActionListener { textInput.transferFocus() }
         textInput.addFocusListener(object : FocusListener {
@@ -56,14 +49,16 @@ class FileInput(fileName: String?, val fileChosen: (String) -> Unit) {
         })
     }
 
+    fun setValue(text: String?) {
+        textInput.text = text
+        textInput.caretPosition = 0
+    }
+
     private fun selectFile(text: String) {
         if (text.isNullOrEmpty()
-                || currentFileName == text
                 || !File(text).exists())
             return
         fileChosen(text)
-        currentFileName = text
-        textInput.text = text
-        textInput.caretPosition = 0
+        setValue(text)
     }
 }

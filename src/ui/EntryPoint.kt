@@ -3,59 +3,86 @@ package ui
 import diff.ChangesBuilder
 import diff.DiffItem
 import diff.PatienceDiffAlgorithm
-import utils.getGridBagConstraints
 import utils.parseIntOrNull
+import utils.throwIfInterrupted
+import utils.time
 import java.awt.*
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import javax.swing.*
+import javax.swing.JButton
+import javax.swing.JFrame
+import javax.swing.JLabel
+import javax.swing.JPanel
 
-class EntryPoint(newUiConfig: UiConfig) : JFrame() {
+class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
 
-    var uiConfig = UiConfig(null, null)
+    private val diffModeCombobox = createModeCombobox()
+    private val contextSizeCombobox = createContextSizeCombobox()
+    private val leftFileInput = FileInput({ file ->
+        recalculateDiff(this.uiConfig.copy(leftFileName = file))
+    })
+
+    private val rightFileInput = FileInput({ file ->
+        recalculateDiff(this.uiConfig.copy(rightFileName = file))
+    })
+
     val leftSide = FileContentPane()
     val rightSide = FileContentPane()
     val changesBuilder = ChangesBuilder()
     val diffAlgorithm = PatienceDiffAlgorithm()
-    var changes = listOf <DiffItem<String>>()
     val backgroundExecutor: ExecutorService = Executors.newFixedThreadPool(1)
+    val cancellationPanel = CancellationPanel()
+    var changes = listOf <DiffItem<String>>()
+    var uiConfig = UiConfig(null, null)
 
     init {
-        initUi(newUiConfig)
-        updateView(newUiConfig)
+        initUi()
+        applyUiConfig(newUiConfig)
+        recalculateDiff(newUiConfig)
     }
 
-    private fun updateView(newConfig: UiConfig) {
-        backgroundExecutor.submit({ ->
-            val startTime = System.nanoTime()
-            val previousLeftFile = uiConfig.leftFileName
-            val previousRightFile = uiConfig.rightFileName
+    private fun recalculateDiff(newConfig: UiConfig) {
+        if (newConfig == uiConfig)
+            return
+        val previousConfig = uiConfig
+        uiConfig = newConfig
+        cancellationPanel.isVisible = true
+        val future = backgroundExecutor.submit<Unit>({ ->
 
-            uiConfig = newConfig
             val theLeftFileName = newConfig.leftFileName
             val theRightFileName = newConfig.rightFileName
             try {
-
-                if (theLeftFileName != previousLeftFile || theRightFileName != previousRightFile) {
+                if (theLeftFileName != previousConfig.leftFileName || theRightFileName != previousConfig.rightFileName) {
                     val leftFile = if (theLeftFileName != null) utils.readFile(theLeftFileName) else emptyList()
                     val rightFile = if (theRightFileName != null) utils.readFile(theRightFileName) else emptyList()
-                    changes = changesBuilder.build(leftFile, rightFile, diffAlgorithm.getMatches(leftFile, rightFile))
+                    changes = time({ -> changesBuilder.build(leftFile, rightFile, diffAlgorithm.getMatches(leftFile, rightFile)) }, "build changes")
                 }
+                Thread.currentThread().throwIfInterrupted()
 
-                val viewModel = ViewModelBuilder(newConfig.diffWords, newConfig.contextLimit).build(changes)
-
-                EventQueue.invokeLater { setModel(viewModel) }
+                val viewModel = time({ -> ViewModelBuilder(newConfig.diffWords, newConfig.contextLimit).build(changes) }, "built viewModel")
+                Thread.currentThread().throwIfInterrupted()
+                time({ ->
+                    leftSide.setContent(viewModel.left)
+                    rightSide.setContent(viewModel.right)
+                }, "set model")
             } catch (e: Exception) {
-                print("Exception building diff between [$theLeftFileName] and [$theRightFileName]: ")
-                e.printStackTrace()
+                if (e is InterruptedException) {
+                    //user-initiated cancellation. don't do anything
+                } else
+                    e.printStackTrace()
+                EventQueue.invokeLater {
+                    uiConfig = previousConfig
+                    applyUiConfig(previousConfig)
+                }
+            } finally {
+                EventQueue.invokeLater { cancellationPanel.isVisible = false }
             }
-            val endTime = System.nanoTime()
-            println("Built diff in ${(endTime - startTime) / 1000000} ms")
         })
+        cancellationPanel.registerForCancellation(future)
     }
 
-    private fun initUi(newConfig: UiConfig) {
+    private fun initUi() {
         title = "DiffTool"
         setLocationRelativeTo(null)
         defaultCloseOperation = EXIT_ON_CLOSE
@@ -64,56 +91,43 @@ class EntryPoint(newUiConfig: UiConfig) : JFrame() {
         leftSide.scrollPane.horizontalScrollBar.model = rightSide.scrollPane.horizontalScrollBar.model
         leftSide.scrollPane.verticalScrollBar.model = rightSide.scrollPane.verticalScrollBar.model
 
-        val toolbar = CreateToolbar(newConfig)
-        val leftFileInput = FileInput(newConfig.leftFileName, { file ->
-            updateView(this.uiConfig.copy(leftFileName = file))
-        })
-        val rightFileInput = FileInput(newConfig.rightFileName, { file ->
-            updateView(this.uiConfig.copy(rightFileName = file))
-        })
+        val toolbar = CreateToolbar()
 
         contentPane.layout = GridBagLayout()
-        contentPane.add(toolbar, getGridBagConstraints {
-            it.fill = GridBagConstraints.HORIZONTAL
-            it.gridwidth = 2
-            it.gridy = 0
+        contentPane.add(toolbar, GridBagConstraints().apply {
+            this.fill = GridBagConstraints.HORIZONTAL
+            this.gridwidth = 2
+            this.gridy = 0
         })
-        contentPane.add(leftFileInput.panel, getGridBagConstraints {
-            it.fill = GridBagConstraints.HORIZONTAL
-            it.weightx = 0.5
-            it.gridy = 1
+        contentPane.add(leftFileInput.panel, GridBagConstraints().apply {
+            this.fill = GridBagConstraints.HORIZONTAL
+            this.weightx = 0.5
+            this.gridy = 1
         })
-        contentPane.add(rightFileInput.panel, getGridBagConstraints {
-            it.fill = GridBagConstraints.HORIZONTAL
-            it.weightx = 0.5
-            it.gridy = 1
+        contentPane.add(rightFileInput.panel, GridBagConstraints().apply {
+            this.fill = GridBagConstraints.HORIZONTAL
+            this.weightx = 0.5
+            this.gridy = 1
         })
-        contentPane.add(leftSide.scrollPane, getGridBagConstraints {
-            it.fill = GridBagConstraints.BOTH
-            it.weightx = 0.5
-            it.weighty = 0.9
-            it.gridy = 2
+        contentPane.add(leftSide.scrollPane, GridBagConstraints().apply {
+            this.fill = GridBagConstraints.BOTH
+            this.weightx = 0.5
+            this.weighty = 0.9
+            this.gridy = 2
         })
-        contentPane.add(rightSide.scrollPane, getGridBagConstraints {
-            it.fill = GridBagConstraints.BOTH
-            it.weightx = 0.5
-            it.weighty = 0.9
-            it.gridy = 2
+        contentPane.add(rightSide.scrollPane, GridBagConstraints().apply {
+            this.fill = GridBagConstraints.BOTH
+            this.weightx = 0.5
+            this.weighty = 0.9
+            this.gridy = 2
         })
 
         pack()
     }
 
-    private fun setModel(viewModel: ViewModel) {
-        leftSide.setContent(viewModel.left)
-        rightSide.setContent(viewModel.right)
-    }
-
-    private fun CreateToolbar(uiConfig: UiConfig): JToolBar {
-        val toolbar = JToolBar()
-        toolbar.isFloatable = false
-        toolbar.isRollover = false
-        toolbar.isBorderPainted = false
+    private fun CreateToolbar(): JPanel {
+        val toolbar = JPanel()
+        toolbar.layout = FlowLayout(FlowLayout.LEFT, 5, 5)
         val nextChangeButton = JButton("next")
         nextChangeButton.addActionListener { i ->
             rightSide.selectNextChange()
@@ -125,60 +139,46 @@ class EntryPoint(newUiConfig: UiConfig) : JFrame() {
             leftSide.selectPreviousChange()
         }
         toolbar.add(prevChangeButton)
-        toolbar.add(Box.createHorizontalStrut(10))
         toolbar.add(nextChangeButton)
-        toolbar.add(Box.createHorizontalStrut(10))
 
         val contextLabel = JLabel("Context size:")
-        val contextItems = arrayOf(ComboboxItem(null, "Unlimited"),
-                ComboboxItem(1),
-                ComboboxItem(2),
-                ComboboxItem(4),
-                ComboboxItem(8))
-        val contextLimit = uiConfig.contextLimit
-        val contextCombobox = CreateCombobox(contextItems,
-                if (contextLimit == null)
-                    null
-                else contextItems.first({ it.value != null && contextLimit > it.value }).value,
-                {
-                    newValue ->
-                    updateView(this.uiConfig.copy(contextLimit = newValue))
-                })
-        val modeItems = arrayOf(
-                ComboboxItem(false, "Show diff lines"),
-                ComboboxItem(true, "Show diff words"))
-        val diffModeButtonCombobox = CreateCombobox(modeItems,
-                uiConfig.diffWords,
-                { newValue ->
-                    updateView(this.uiConfig.copy(diffWords = newValue))
-                })
+
         toolbar.add(contextLabel)
-        toolbar.add(contextCombobox)
-        toolbar.add(Box.createHorizontalStrut(10))
-        toolbar.add(diffModeButtonCombobox)
+        toolbar.add(contextSizeCombobox)
+        toolbar.add(diffModeCombobox)
+        toolbar.add(cancellationPanel)
         return toolbar
     }
 
-    private fun <T> CreateCombobox(items: Array<ComboboxItem<T>>, value: T?, valueChanged: (T) -> Unit): JComboBox<ComboboxItem<T>> {
-        val combobox = JComboBox(items)
-        combobox.prototypeDisplayValue = items.first()
-        combobox.selectedItem = if (value == null)
-            items.first()
-        else items.last({ item -> item.value == value })
-        combobox.maximumSize = Dimension(200, 40)
-        combobox.addActionListener {
-            i ->
-            @Suppress("UNCHECKED_CAST")
-            val item = combobox.selectedItem as ComboboxItem<T>
-            valueChanged(item.value)
-        }
-        return combobox
+    private fun applyUiConfig(uiConfig: UiConfig) {
+        contextSizeCombobox.setValue(uiConfig.contextLimit)
+        diffModeCombobox.setValue(uiConfig.diffWords)
+        leftFileInput.setValue(uiConfig.leftFileName)
+        rightFileInput.setValue(uiConfig.rightFileName)
     }
 
-    private class ComboboxItem<out T>(val value: T, val description: String = value.toString()) {
-        override fun toString(): String {
-            return description
-        }
+    private fun createContextSizeCombobox(): SimpleCombobox<Int?> {
+        val contextItems = arrayOf(SimpleCombobox.Item(null, "Unlimited"),
+                SimpleCombobox.Item(1),
+                SimpleCombobox.Item(2),
+                SimpleCombobox.Item(4),
+                SimpleCombobox.Item(8))
+        return SimpleCombobox(contextItems, null,
+                {
+                    newValue ->
+                    recalculateDiff(this.uiConfig.copy(contextLimit = newValue))
+                })
+    }
+
+    private fun createModeCombobox(): SimpleCombobox<Boolean> {
+        val modeItems = arrayOf(
+                SimpleCombobox.Item(false, "Show diff lines"),
+                SimpleCombobox.Item(true, "Show diff words"))
+        return SimpleCombobox(modeItems,
+                false,
+                { newValue ->
+                    recalculateDiff(this.uiConfig.copy(diffWords = newValue))
+                })
     }
 
     data class UiConfig(
@@ -187,7 +187,6 @@ class EntryPoint(newUiConfig: UiConfig) : JFrame() {
             val diffWords: Boolean = false,
             val contextLimit: Int? = null) {
     }
-
 
     companion object {
 

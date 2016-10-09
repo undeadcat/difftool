@@ -1,5 +1,6 @@
 package diff
 
+import utils.throwIfInterrupted
 import java.util.*
 
 class DiffAlgorithm() {
@@ -59,7 +60,10 @@ class DiffAlgorithm() {
         val unvisited = BucketQueue<T>(maxPriority)
         unvisited.add(start, 0)
         distances[start] = 0
+        var iterationCount = 0
         while (true) {
+            if (iterationCount % 10000 == 0)
+                Thread.currentThread().throwIfInterrupted()
             val current = unvisited.dequeueMin()
             if (current == null || current == end)
                 return previous
@@ -78,6 +82,7 @@ class DiffAlgorithm() {
                 }
             }
             visited.add(current)
+            iterationCount++
         }
     }
 
