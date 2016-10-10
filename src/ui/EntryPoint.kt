@@ -55,8 +55,8 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
             val theRightFileName = newConfig.rightFileName
             try {
                 if (theLeftFileName != previousConfig.leftFileName || theRightFileName != previousConfig.rightFileName) {
-                    val leftFile = if (theLeftFileName != null) utils.readFile(theLeftFileName, progressIndicator.createChild(20)) else emptyList()
-                    val rightFile = if (theRightFileName != null) utils.readFile(theRightFileName, progressIndicator.createChild(20)) else emptyList()
+                    val leftFile = if (theLeftFileName != null) utils.readFile(theLeftFileName, progressIndicator.createChild(5)) else emptyList()
+                    val rightFile = if (theRightFileName != null) utils.readFile(theRightFileName, progressIndicator.createChild(10)) else emptyList()
                     changes = time({ -> changesBuilder.build(leftFile, rightFile, diffAlgorithm.getMatches(leftFile, rightFile, progressIndicator.createChild(90))) }, "build changes")
                 }
                 Thread.currentThread().throwIfInterrupted()

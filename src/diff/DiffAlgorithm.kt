@@ -30,7 +30,7 @@ class DiffAlgorithm() {
             return result
         }
 
-        progressIndicator.setMax(left.size + right.size * (left.size + right.size) * 2.toLong())
+        progressIndicator.setMax(((left.size + right.size) * ((left.size + right.size) / 2).toDouble()).toLong())
         val previousNodes = dijkstra(startNode, end, leftNonUnique.size + rightNonUnique.size, ::getNeighbors, { l, r -> getDistance(l, r) }, progressIndicator)
         progressIndicator.done()
         val matches = toMatches(previousNodes, startNode, end)

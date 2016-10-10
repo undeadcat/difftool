@@ -8,10 +8,6 @@ open class ProgressIndicator(private val percentReached: ((Int) -> Unit) = {}) {
         this.value = 0
     }
 
-    fun report() {
-        report(this.value + 1)
-    }
-
     open fun report(value: Long) {
         val myMaxValue = maxValue
         if (myMaxValue == null)
@@ -25,10 +21,10 @@ open class ProgressIndicator(private val percentReached: ((Int) -> Unit) = {}) {
         if (myMaxValue == 0L) {
             percentReached(100)
         } else {
-            val previousPercent = previousValue / myMaxValue.toDouble() * 100
-            val currentPercent = value / myMaxValue.toDouble() * 100
+            val previousPercent = (previousValue / myMaxValue.toDouble() * 100).toInt()
+            val currentPercent = (value / myMaxValue.toDouble() * 100).toInt()
             if (currentPercent != previousPercent)
-                percentReached(currentPercent.toInt())
+                percentReached(currentPercent)
         }
     }
 

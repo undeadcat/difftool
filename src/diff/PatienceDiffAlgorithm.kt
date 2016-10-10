@@ -16,14 +16,11 @@ class PatienceDiffAlgorithm() {
             return left.mapIndexed { i, t -> Match(i, i) }
 
         Thread.currentThread().throwIfInterrupted()
-        progressIndicator.setMax(100)
-        val matches = getPatienceMatchesOrEmpty(left, right, progressIndicator.createChild(50))
+        val matches = getPatienceMatchesOrEmpty(left, right, progressIndicator)
 
-        val result = if (matches.isEmpty())
-            diffAlgorithm.getMatches(left, right, { it -> it }, progressIndicator.createChild(100))
+        return if (matches.isEmpty())
+            diffAlgorithm.getMatches(left, right, { it -> it }, progressIndicator)
         else matches
-        progressIndicator.done()
-        return result
     }
 
     private fun <T> getPatienceMatchesOrEmpty(left: List<T>, right: List<T>, progressIndicator: ProgressIndicator): List<Match> {
@@ -47,13 +44,11 @@ class PatienceDiffAlgorithm() {
         val rightUnique = getUnique(right)
         val leftCandidates = getIntersection(leftUnique, rightUnique)
         val rightCandidates = getIntersection(rightUnique, leftUnique)
+        if (leftCandidates.isEmpty()|| rightCandidates.isEmpty())
+            return emptyList()
         progressIndicator.setMax(100)
         val matches = DiffAlgorithm().getMatches(leftCandidates, rightCandidates, { it.value }, progressIndicator.createChild(50))
                 .map { match -> Match(leftCandidates[match.left].index, rightCandidates[match.right].index) }
-        if (matches.isEmpty()) {
-            progressIndicator.done()
-            return matches
-        }
 
         val nestedMatchesProgressIndicator = progressIndicator.createChild(100)
         nestedMatchesProgressIndicator.setMax(left.size + right.size.toLong())
