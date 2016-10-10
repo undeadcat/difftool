@@ -3,17 +3,21 @@ package ui
 import utils.splitByCount
 import java.awt.EventQueue
 import java.util.*
+import javax.swing.BoundedRangeModel
 import javax.swing.JScrollPane
 import javax.swing.JTextPane
 import javax.swing.text.*
 
 class LazyTextPane {
     val textPane = JTextPane()
-    val scrollPane = JScrollPane(textPane)
+    val scrollPane = JScrollPane(textPane)//, ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER)
     private val pendingHighlights = ArrayDeque<HighlightInfo>()
     private val pendingStrings = ArrayDeque<String>()
+//    private val myScrollBar = JScrollBar()
 
     init {
+//        scrollPane.layout.addLayoutComponent(ScrollPaneConstants.VERTICAL_SCROLLBAR, myScrollBar)
+//        myScrollBar.size = Dimension(800,20)
         textPane.isEditable = false
         textPane.editorKit = NoWrapEditorKit()
         textPane.caret = DefaultCaret().apply { this.updatePolicy = DefaultCaret.NEVER_UPDATE }
@@ -32,6 +36,10 @@ class LazyTextPane {
         }
     }
 
+    fun setScrollModel(model: BoundedRangeModel) {
+//        myScrollBar.model = model
+    }
+
     fun appendLine(content: String) {
         pendingStrings.addLast(content)
     }
@@ -48,7 +56,7 @@ class LazyTextPane {
     }
 
     fun ensureCurrentPageLoaded() {
-        val loadTarget = scrollPane.verticalScrollBar.value + textPane.visibleRect.height * 2
+        val loadTarget = textPane.visibleRect.y + textPane.visibleRect.height * 2
         ensureLoaded {
             getLoadedViewSize() > loadTarget
         }
@@ -66,7 +74,6 @@ class LazyTextPane {
 
     private fun ensureLoaded(condition: () -> Boolean) {
         var loadedTextOffset = textPane.document.length
-
 
         val attributes = getDocumentAttributes()
         while (!pendingStrings.isEmpty() && !condition()) {

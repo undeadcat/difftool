@@ -4,6 +4,7 @@ import java.awt.Color
 import java.awt.EventQueue
 import java.awt.Graphics2D
 import java.awt.Rectangle
+import javax.swing.DefaultBoundedRangeModel
 import javax.swing.event.CaretListener
 import javax.swing.text.DefaultHighlighter
 import javax.swing.text.Highlighter
@@ -22,6 +23,7 @@ class FileContentPane() {
 
     fun setContent(text: Iterable<BlockModel>) {
         lazyTextPane.clear()
+        lazyTextPane.setScrollModel(createScrollbarModel(text))
         selectionModel = SelectionModel(text)
         EventQueue.invokeLater { lazyTextPane.textPane.removeCaretListener { lineSelectionHandler } }
 
@@ -157,8 +159,16 @@ class FileContentPane() {
             else -> return null
         }
     }
+
+    private fun createScrollbarModel(blocks: Iterable<BlockModel>): DefaultBoundedRangeModel {
+        val lineCount = blocks
+                .flatMap { it.content.plus(it.padding?.content ?: emptyList()) }.count()
+        return javax.swing.DefaultBoundedRangeModel(0, lazyTextPane.textPane.visibleRect.height, 0,
+                lineCount * lazyTextPane.textPane.font.size)
+    }
 }
 
 data class TextSpan(val start: Int, val end: Int) {
 
 }
+

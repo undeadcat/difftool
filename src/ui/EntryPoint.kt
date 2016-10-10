@@ -48,38 +48,42 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
         val previousConfig = uiConfig
         uiConfig = newConfig
         cancellationPanel.isVisible = true
+        val progressIndicator = cancellationPanel.createProgressIndicator()
         val future = backgroundExecutor.submit<Unit>({ ->
 
             val theLeftFileName = newConfig.leftFileName
             val theRightFileName = newConfig.rightFileName
             try {
                 if (theLeftFileName != previousConfig.leftFileName || theRightFileName != previousConfig.rightFileName) {
-                    val leftFile = if (theLeftFileName != null) utils.readFile(theLeftFileName) else emptyList()
-                    val rightFile = if (theRightFileName != null) utils.readFile(theRightFileName) else emptyList()
-                    changes = time({ -> changesBuilder.build(leftFile, rightFile, diffAlgorithm.getMatches(leftFile, rightFile)) }, "build changes")
+                    val leftFile = if (theLeftFileName != null) utils.readFile(theLeftFileName, progressIndicator.createChild(20)) else emptyList()
+                    val rightFile = if (theRightFileName != null) utils.readFile(theRightFileName, progressIndicator.createChild(20)) else emptyList()
+                    changes = time({ -> changesBuilder.build(leftFile, rightFile, diffAlgorithm.getMatches(leftFile, rightFile, progressIndicator.createChild(90))) }, "build changes")
                 }
                 Thread.currentThread().throwIfInterrupted()
 
                 val viewModel = time({ -> ViewModelBuilder(newConfig.diffWords, newConfig.contextLimit).build(changes) }, "built viewModel")
+                progressIndicator.done()
                 Thread.currentThread().throwIfInterrupted()
                 time({ ->
                     leftSide.setContent(viewModel.left)
                     rightSide.setContent(viewModel.right)
                 }, "set model")
-            } catch (e: Exception) {
+            }
+            catch (e: Exception) {
                 if (e is InterruptedException) {
                     //user-initiated cancellation. don't do anything
-                } else
-                    e.printStackTrace()
+                } else e.printStackTrace()
+
                 EventQueue.invokeLater {
                     uiConfig = previousConfig
                     applyUiConfig(previousConfig)
                 }
-            } finally {
+            }
+            finally {
                 EventQueue.invokeLater { cancellationPanel.isVisible = false }
             }
         })
-        cancellationPanel.registerForCancellation(future)
+        cancellationPanel.registerForCancellation({ future.cancel(true) })
     }
 
     private fun initUi() {

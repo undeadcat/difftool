@@ -1,5 +1,6 @@
 package diff
 
+import utils.ProgressIndicator
 import utils.pairwise
 import utils.sequenceEquals
 import utils.throwIfInterrupted
@@ -8,25 +9,28 @@ import java.util.*
 class PatienceDiffAlgorithm() {
 
     private val diffAlgorithm = DiffAlgorithm()
-    fun <T> getMatches(left: List<T>, right: List<T>): List<Match> {
+    fun <T> getMatches(left: List<T>, right: List<T>, progressIndicator: ProgressIndicator = ProgressIndicator.empty): List<Match> {
         if (left.isEmpty() || right.isEmpty())
             return emptyList()
         if (left.sequenceEquals(right))
             return left.mapIndexed { i, t -> Match(i, i) }
 
         Thread.currentThread().throwIfInterrupted()
-        val matches = getPatienceMatchesOrEmpty(left, right)
+        progressIndicator.setMax(100)
+        val matches = getPatienceMatchesOrEmpty(left, right, progressIndicator.createChild(50))
 
-        if (matches.isEmpty())
-            return diffAlgorithm.getMatches(left, right, { it -> it })
-        else return matches
+        val result = if (matches.isEmpty())
+            diffAlgorithm.getMatches(left, right, { it -> it }, progressIndicator.createChild(100))
+        else matches
+        progressIndicator.done()
+        return result
     }
 
-    private fun <T> getPatienceMatchesOrEmpty(left: List<T>, right: List<T>): List<Match> {
+    private fun <T> getPatienceMatchesOrEmpty(left: List<T>, right: List<T>, progressIndicator: ProgressIndicator): List<Match> {
         val startMatch = Match(-1, -1)
         val endMatch = Match(left.size, right.size)
 
-        fun getMatchesBetween(previousMatch: Match, nextMatch: Match): ArrayList<Match> {
+        fun getMatchesBetween(previousMatch: Match, nextMatch: Match, myProgressIndicator: ProgressIndicator): ArrayList<Match> {
             val results = arrayListOf<Match>()
             if (previousMatch != startMatch)
                 results.add(previousMatch)
@@ -34,7 +38,7 @@ class PatienceDiffAlgorithm() {
             val startIndexRight = previousMatch.right + 1
             val newLeftItems = left.subList(startIndexLeft, nextMatch.left)
             val newRightItems = right.subList(startIndexRight, nextMatch.right)
-            val newMatches = getMatches(newLeftItems, newRightItems)
+            val newMatches = getMatches(newLeftItems, newRightItems, myProgressIndicator.createChild(nextMatch.right + nextMatch.left))
             results.addAll(newMatches.map { match -> Match(startIndexLeft + match.left, startIndexRight + match.right) })
             return results
         }
@@ -43,16 +47,24 @@ class PatienceDiffAlgorithm() {
         val rightUnique = getUnique(right)
         val leftCandidates = getIntersection(leftUnique, rightUnique)
         val rightCandidates = getIntersection(rightUnique, leftUnique)
-        val matches = DiffAlgorithm().getMatches(leftCandidates, rightCandidates, { it.value })
+        progressIndicator.setMax(100)
+        val matches = DiffAlgorithm().getMatches(leftCandidates, rightCandidates, { it.value }, progressIndicator.createChild(50))
                 .map { match -> Match(leftCandidates[match.left].index, rightCandidates[match.right].index) }
-        if (matches.isEmpty())
+        if (matches.isEmpty()) {
+            progressIndicator.done()
             return matches
+        }
 
-        return arrayListOf(startMatch)
+        val nestedMatchesProgressIndicator = progressIndicator.createChild(100)
+        nestedMatchesProgressIndicator.setMax(left.size + right.size.toLong())
+        val nestedMatches = arrayListOf(startMatch)
                 .plus(matches)
                 .plus(endMatch)
                 .pairwise()
-                .flatMap { pair -> getMatchesBetween(pair.first, pair.second) }
+                .flatMap { pair -> getMatchesBetween(pair.first, pair.second, nestedMatchesProgressIndicator) }
+        nestedMatchesProgressIndicator.done()
+        progressIndicator.done()
+        return nestedMatches
     }
 
     private fun <T> getIntersection(thisSide: Map<T, IndexedValue<T>>, opposite: Map<T, IndexedValue<T>>): List<IndexedValue<T>> {

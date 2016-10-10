@@ -159,16 +159,6 @@ color: green;
         ))
     }
 
-    @Test
-    fun integrationTest() {
-        val left = readFile("/Users/mskr/Desktop/gc.cpp")
-        val right = readFile("/Users/mskr/Desktop/QueryGrammar.cs")
-        for (i in 0..10) {
-            time({ getDiff(left, right) }, "")
-        }
-
-    }
-
     private fun checkEqual(actual: List<DiffItem<String>>, expected: List<DiffItem<String>>) {
         Assert.assertThat(formatChanges(actual), Is.`is`(formatChanges(expected)))
     }
