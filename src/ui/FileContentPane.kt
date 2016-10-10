@@ -115,8 +115,6 @@ class FileContentPane() {
 
     private fun getHighlighter(color: Color, painter: (Graphics2D, Rectangle) -> Unit): Highlighter.HighlightPainter {
         return Highlighter.HighlightPainter(fun(g, p1, p2, @Suppress("UNUSED_PARAMETER") unused, textComponent) {
-            if (p2 > textComponent.document.length)
-                return
             g.color = color
             val startPosition = textComponent.modelToView(p1)
             val endPosition = textComponent.modelToView(p2)

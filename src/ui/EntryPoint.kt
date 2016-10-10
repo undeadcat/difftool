@@ -62,19 +62,20 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
 
                 val viewModel = time({ -> ViewModelBuilder(newConfig.diffWords, newConfig.contextLimit).build(changes) }, "built viewModel")
                 Thread.currentThread().throwIfInterrupted()
-                time({ ->
-                    leftSide.setContent(viewModel.left)
-                    rightSide.setContent(viewModel.right)
-                }, "set model")
+                EventQueue.invokeLater {
+                    time({ ->
+                        leftSide.setContent(viewModel.left)
+                        rightSide.setContent(viewModel.right)
+                    }, "set model")
+                }
+
             } catch (e: Exception) {
                 if (e is InterruptedException) {
                     //user-initiated cancellation. don't do anything
                 } else
                     e.printStackTrace()
-                EventQueue.invokeLater {
-                    uiConfig = previousConfig
-                    applyUiConfig(previousConfig)
-                }
+                uiConfig = previousConfig
+                EventQueue.invokeLater { applyUiConfig(previousConfig) }
             } finally {
                 EventQueue.invokeLater { cancellationPanel.isVisible = false }
             }
