@@ -21,22 +21,21 @@ class FileContentPane() {
     })
 
     fun setContent(text: Iterable<BlockModel>) {
-//        EventQueue.invokeLater {
-//            lazyTextPane.textPane.removeCaretListener(lineSelectionHandler)
-//        }
         lazyTextPane.clear()
         selectionModel = SelectionModel(text)
+        EventQueue.invokeLater { lazyTextPane.textPane.removeCaretListener { lineSelectionHandler } }
 
         fun appendBlock(offset: Int, block: BlockModel, getHighlighter: (BlockType) -> Highlighter.HighlightPainter?): Int {
-            var offset = offset
+            var reusultOffset = offset
             val highlighter = getHighlighter(block.type)
             for (line in block.content) {
-                lazyTextPane.appendLine(line + "\n")
+                val actualContent = line + block.separator
+                lazyTextPane.appendLine(actualContent)
                 if (highlighter != null)
-                    lazyTextPane.enqueueHighlight(offset, offset + line.length, highlighter)
-                offset += (line + "\n").length
+                    lazyTextPane.enqueueHighlight(reusultOffset, reusultOffset + actualContent.length, highlighter)
+                reusultOffset += actualContent.length
             }
-            return offset
+            return reusultOffset
         }
 
         fun appendLineBlock(offset: Int, block: BlockModel): Int {
@@ -47,8 +46,8 @@ class FileContentPane() {
         for (block in text) {
             val blockStartOffset = offset
             if (block.children != null) {
-                offset = appendLineBlock(offset, block)
                 var wordsStartOffset = offset
+                offset = appendLineBlock(offset, block)
                 for (child in block.children) {
                     val highlighter = getWordHighlighter(child.type)
                     if (highlighter != null)
@@ -65,9 +64,8 @@ class FileContentPane() {
         }
         EventQueue.invokeLater {
             lazyTextPane.ensureCurrentPageLoaded()
-//            lazyTextPane.textPane.addCaretListener(lineSelectionHandler)
+            lazyTextPane.textPane.addCaretListener(lineSelectionHandler)
         }
-
     }
 
     fun setLineSelectedListener(listener: (Int) -> Unit) {
@@ -89,8 +87,13 @@ class FileContentPane() {
     private fun selectChange(span: TextSpan?) {
         if (span == null)
             return
-        scrollToOffset(span.start)
-        highlightSelectedSpan(span)
+        lazyTextPane.ensureLoadedTo(span.end)
+        //nasty hacks. we need scroll to happen _ after_
+        //recalculations that are enqueued onto the ui thread by updating the document
+        EventQueue.invokeLater {
+            scrollToOffset(span.start)
+            highlightSelectedSpan(span)
+        }
     }
 
     private fun highlightSelectedSpan(span: TextSpan) {
@@ -102,7 +105,6 @@ class FileContentPane() {
     }
 
     private fun scrollToOffset(offset: Int) {
-        lazyTextPane.ensureLoadedTo(offset)
         val targetY = lazyTextPane.textPane.modelToView(offset).y
         val newY = targetY - lazyTextPane.textPane.visibleRect.height / 2
         lazyTextPane.scrollPane.verticalScrollBar.value = if (newY < 0) 0 else newY

@@ -10,12 +10,7 @@ import javax.swing.text.*
 class LazyTextPane {
     val textPane = JTextPane()
     val scrollPane = JScrollPane(textPane)
-    private val pendingHighlights = PriorityQueue<HighlightInfo>({ left, right ->
-        val ends = left.endOffset.compareTo(right.endOffset)
-        if (ends != 0)
-            left.startOffset.compareTo(right.startOffset)
-        else ends
-    })
+    private val pendingHighlights = ArrayDeque<HighlightInfo>()
     private val pendingStrings = ArrayDeque<String>()
 
     init {
@@ -35,16 +30,10 @@ class LazyTextPane {
             textPane.highlighter.removeAllHighlights()
             textPane.document.remove(0, textPane.document.length)
         }
-
     }
 
     fun appendLine(content: String) {
-        val charsOnScreenApproximately = textPane.visibleRect.width / textPane.font.size *
-                (textPane.visibleRect.height / textPane.font.size)
-        val strings = splitByCount(content, charsOnScreenApproximately)
-        for (s in strings) {
-            pendingStrings.addLast(s)
-        }
+        pendingStrings.addLast(content)
     }
 
     fun enqueueHighlight(startOffset: Int, endOffset: Int, highlighter: Highlighter.HighlightPainter) {
@@ -88,16 +77,10 @@ class LazyTextPane {
         }
 
         do {
-            var highlight = pendingHighlights.peek()
-            if (highlight == null || highlight.startOffset >= loadedTextOffset - 1)
+            val highlight = pendingHighlights.peek()
+            if (highlight == null || highlight.endOffset >= loadedTextOffset - 1)
                 break
             pendingHighlights.remove()
-            if (highlight.endOffset >= loadedTextOffset - 1 && highlight.endOffset - highlight.startOffset > 0) {
-                val text = textPane.document.getText(highlightedOffset, loadedTextOffset)
-                val newLine = text.lastIndexOf("\n", loadedTextOffset - 1)
-                pendingHighlights.offer(highlight.copy(startOffset = newLine - 1))
-                highlight = highlight.copy(endOffset = newLine - 1)
-            }
             textPane.highlighter.addHighlight(highlight.startOffset, highlight.endOffset, highlight.highlighter)
             highlightedOffset = highlight.endOffset
 
