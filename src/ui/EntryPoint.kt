@@ -90,8 +90,8 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
 
         leftSide.setLineSelectedListener { rightSide.selectByLineNumber(it) }
         rightSide.setLineSelectedListener { leftSide.selectByLineNumber(it) }
-        leftSide.scrollPane.horizontalScrollBar.model = rightSide.scrollPane.horizontalScrollBar.model
-        leftSide.scrollPane.verticalScrollBar.model = rightSide.scrollPane.verticalScrollBar.model
+        leftSide.lazyTextPane.scrollPane.horizontalScrollBar.model = rightSide.lazyTextPane.scrollPane.horizontalScrollBar.model
+        leftSide.lazyTextPane.scrollPane.verticalScrollBar.model = rightSide.lazyTextPane.scrollPane.verticalScrollBar.model
 
         val toolbar = CreateToolbar()
 
@@ -111,13 +111,13 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
             this.weightx = 0.5
             this.gridy = 1
         })
-        contentPane.add(leftSide.scrollPane, GridBagConstraints().apply {
+        contentPane.add(leftSide.lazyTextPane.scrollPane, GridBagConstraints().apply {
             this.fill = GridBagConstraints.BOTH
             this.weightx = 0.5
             this.weighty = 0.9
             this.gridy = 2
         })
-        contentPane.add(rightSide.scrollPane, GridBagConstraints().apply {
+        contentPane.add(rightSide.lazyTextPane.scrollPane, GridBagConstraints().apply {
             this.fill = GridBagConstraints.BOTH
             this.weightx = 0.5
             this.weighty = 0.9

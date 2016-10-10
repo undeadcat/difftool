@@ -3,7 +3,10 @@ package test
 import diff.*
 import org.hamcrest.core.Is
 import org.junit.Assert
+import org.junit.Ignore
 import org.junit.Test
+import utils.readFile
+import utils.time
 
 class DiffAlgorithmTest {
     @Test
@@ -154,6 +157,16 @@ color: green;
                 DiffItem.Matched(listOf("unique")),
                 DiffItem.Changed(emptyList(), commonNonUnique)
         ))
+    }
+
+    @Test
+    fun integrationTest() {
+        val left = readFile("/Users/mskr/Desktop/gc.cpp")
+        val right = readFile("/Users/mskr/Desktop/QueryGrammar.cs")
+        for (i in 0..10) {
+            time({ getDiff(left, right) }, "")
+        }
+
     }
 
     private fun checkEqual(actual: List<DiffItem<String>>, expected: List<DiffItem<String>>) {

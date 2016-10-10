@@ -76,7 +76,7 @@ class DiffAlgorithm() {
                     distances[node] = viaCurrent
                     previous[node] = current
                     if (oldDistance != null)
-                        unvisited.delete(current)
+                        unvisited.delete(node)
                     unvisited.add(node, viaCurrent)
 
                 }

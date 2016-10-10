@@ -3,27 +3,20 @@ package diff
 import java.util.*
 
 class BucketQueue<T>(maxPriority: Int) {
-    private val buckets = Array(maxPriority + 1, { i -> LinkedList<T>() })
-    private val itemToNode = HashMap<T, Node<T>>()
+    private val buckets = Array(maxPriority + 1, { i -> ArrayDeque<T>() })
     var minPriority: Int? = null
 
     fun add(item: T, priority: Int) {
         val bucket = buckets[priority]
-        val node = Node(null, null, item, priority)
-        itemToNode[item] = node
-        bucket.addLast(node)
+        bucket.add(item)
         val theMinPriority = minPriority
         if (theMinPriority == null || priority < theMinPriority)
             minPriority = priority
     }
 
-    fun delete(item: T) {
-        val node = itemToNode[item]
-        if (node == null)
-            throw Exception("Item ${item} is not in queue")
-        val bucket = buckets[node.priority]
-        bucket.remove(node)
-        itemToNode.remove(item)
+    fun delete(oldPriority: Int, item: T) {
+        val bucket = buckets[oldPriority]
+        bucket.remove(item)
         if (bucket.isEmpty())
             updatePriority()
     }
@@ -37,10 +30,9 @@ class BucketQueue<T>(maxPriority: Int) {
             return null
         val node = bucket.first()
         bucket.remove(node)
-        itemToNode.remove(node.element)
         if (bucket.isEmpty())
             updatePriority()
-        return node.element
+        return node
     }
 
     private fun updatePriority() {

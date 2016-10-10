@@ -22,7 +22,7 @@ class BucketQueueTest {
         val q = BucketQueue<String>(6)
         q.add("a", 3)
         q.add("b", 1)
-        q.delete("a")
+        q.delete(3, "a")
         q.add("a", 5)
         Assert.assertThat(drain(q), Is.`is`(arrayListOf("b", "a")))
     }
