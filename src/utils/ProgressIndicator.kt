@@ -58,7 +58,7 @@ open class ProgressIndicator(private val percentReached: ((Int) -> Unit) = {}) {
         }
     }
 
-    companion object Statics {
+    companion object {
         val empty: ProgressIndicator = EmptyProgressIndicator()
     }
 }

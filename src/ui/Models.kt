@@ -21,4 +21,3 @@ data class BlockModel(val type: BlockType, val content: List<String>, val separa
         return content.joinToString(separator) + separator
     }
 }
-

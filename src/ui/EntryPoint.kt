@@ -64,12 +64,9 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
                 val viewModel = time({ -> ViewModelBuilder(newConfig.diffWords, newConfig.contextLimit).build(changes) }, "built viewModel")
                 progressIndicator.done()
                 Thread.currentThread().throwIfInterrupted()
-                time({ ->
-                    leftSide.setContent(viewModel.left)
-                    rightSide.setContent(viewModel.right)
-                }, "set model")
-            }
-            catch (e: Exception) {
+                EventQueue.invokeLater { leftSide.setContent(viewModel.left) }
+                EventQueue.invokeLater { rightSide.setContent(viewModel.right) }
+            } catch (e: Exception) {
                 if (e is InterruptedException) {
                     //user-initiated cancellation. don't do anything
                 } else e.printStackTrace()
@@ -78,8 +75,7 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
                     uiConfig = previousConfig
                     applyUiConfig(previousConfig)
                 }
-            }
-            finally {
+            } finally {
                 EventQueue.invokeLater { cancellationPanel.isVisible = false }
             }
         })
@@ -94,8 +90,8 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
 
         leftSide.setLineSelectedListener { rightSide.selectByLineNumber(it) }
         rightSide.setLineSelectedListener { leftSide.selectByLineNumber(it) }
-        leftSide.lazyTextPane.scrollPane.horizontalScrollBar.model = rightSide.lazyTextPane.scrollPane.horizontalScrollBar.model
-        leftSide.lazyTextPane.scrollPane.verticalScrollBar.model = rightSide.lazyTextPane.scrollPane.verticalScrollBar.model
+        leftSide.lazyTextPane.verticalScrollModel = rightSide.lazyTextPane.verticalScrollModel
+        leftSide.lazyTextPane.horizontalScrollModel = rightSide.lazyTextPane.horizontalScrollModel
 
         val toolbar = CreateToolbar()
 
@@ -115,13 +111,13 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
             this.weightx = 0.5
             this.gridy = 1
         })
-        contentPane.add(leftSide.lazyTextPane.scrollPane, GridBagConstraints().apply {
+        contentPane.add(leftSide.lazyTextPane.rootPane, GridBagConstraints().apply {
             this.fill = GridBagConstraints.BOTH
             this.weightx = 0.5
             this.weighty = 0.9
             this.gridy = 2
         })
-        contentPane.add(rightSide.lazyTextPane.scrollPane, GridBagConstraints().apply {
+        contentPane.add(rightSide.lazyTextPane.rootPane, GridBagConstraints().apply {
             this.fill = GridBagConstraints.BOTH
             this.weightx = 0.5
             this.weighty = 0.9
