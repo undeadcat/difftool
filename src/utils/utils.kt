@@ -1,5 +1,6 @@
 package utils
 
+import java.io.File
 import java.io.FileInputStream
 import java.util.*
 
@@ -34,11 +35,12 @@ fun parseIntOrNull(str: String?): Int? {
     }
 }
 
-fun readFile(file: String): List<String> {
+fun readFile(file: String, progressIndicator: ProgressIndicator = ProgressIndicator.empty): List<String> {
     //check for interruption via Thread.interrupt() manually because
     //Files.ReadAllText should support interruption (uses nio channels)
     //but does not because InputStream.read() swallows InterruptedIOException : IOException
     //:-(
+    progressIndicator.setMax(File(file).length())
     val input = FileInputStream(file)
     val result = StringBuilder()
     try {
@@ -48,11 +50,13 @@ fun readFile(file: String): List<String> {
             Thread.currentThread().throwIfInterrupted()
             read = input.read(byteBuffer)
             if (read > 0) {
+                progressIndicator.report(progressIndicator.value + read)
                 result.append(String(byteBuffer, 0, read))
             } else break
         }
     } finally {
         input.close()
+        progressIndicator.done()
     }
     return result.split("\n", "\r\n")
 }

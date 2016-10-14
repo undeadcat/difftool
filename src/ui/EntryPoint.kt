@@ -48,39 +48,38 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
         val previousConfig = uiConfig
         uiConfig = newConfig
         cancellationPanel.isVisible = true
+        val progressIndicator = cancellationPanel.createProgressIndicator()
         val future = backgroundExecutor.submit<Unit>({ ->
 
             val theLeftFileName = newConfig.leftFileName
             val theRightFileName = newConfig.rightFileName
             try {
                 if (theLeftFileName != previousConfig.leftFileName || theRightFileName != previousConfig.rightFileName) {
-                    val leftFile = if (theLeftFileName != null) utils.readFile(theLeftFileName) else emptyList()
-                    val rightFile = if (theRightFileName != null) utils.readFile(theRightFileName) else emptyList()
-                    changes = time({ -> changesBuilder.build(leftFile, rightFile, diffAlgorithm.getMatches(leftFile, rightFile)) }, "build changes")
+                    val leftFile = if (theLeftFileName != null) utils.readFile(theLeftFileName, progressIndicator.createChild(5)) else emptyList()
+                    val rightFile = if (theRightFileName != null) utils.readFile(theRightFileName, progressIndicator.createChild(10)) else emptyList()
+                    changes = time({ -> changesBuilder.build(leftFile, rightFile, diffAlgorithm.getMatches(leftFile, rightFile, progressIndicator.createChild(90))) }, "build changes")
                 }
                 Thread.currentThread().throwIfInterrupted()
 
                 val viewModel = time({ -> ViewModelBuilder(newConfig.diffWords, newConfig.contextLimit).build(changes) }, "built viewModel")
+                progressIndicator.done()
                 Thread.currentThread().throwIfInterrupted()
-                EventQueue.invokeLater {
-                    time({ ->
-                        leftSide.setContent(viewModel.left)
-                        rightSide.setContent(viewModel.right)
-                    }, "set model")
-                }
-
+                EventQueue.invokeLater { leftSide.setContent(viewModel.left) }
+                EventQueue.invokeLater { rightSide.setContent(viewModel.right) }
             } catch (e: Exception) {
                 if (e is InterruptedException) {
                     //user-initiated cancellation. don't do anything
-                } else
-                    e.printStackTrace()
-                uiConfig = previousConfig
-                EventQueue.invokeLater { applyUiConfig(previousConfig) }
+                } else e.printStackTrace()
+
+                EventQueue.invokeLater {
+                    uiConfig = previousConfig
+                    applyUiConfig(previousConfig)
+                }
             } finally {
                 EventQueue.invokeLater { cancellationPanel.isVisible = false }
             }
         })
-        cancellationPanel.registerForCancellation(future)
+        cancellationPanel.registerForCancellation({ future.cancel(true) })
     }
 
     private fun initUi() {
@@ -91,8 +90,8 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
 
         leftSide.setLineSelectedListener { rightSide.selectByLineNumber(it) }
         rightSide.setLineSelectedListener { leftSide.selectByLineNumber(it) }
-        leftSide.scrollPane.horizontalScrollBar.model = rightSide.scrollPane.horizontalScrollBar.model
-        leftSide.scrollPane.verticalScrollBar.model = rightSide.scrollPane.verticalScrollBar.model
+        leftSide.lazyTextPane.verticalScrollModel = rightSide.lazyTextPane.verticalScrollModel
+        leftSide.lazyTextPane.horizontalScrollModel = rightSide.lazyTextPane.horizontalScrollModel
 
         val toolbar = CreateToolbar()
 
@@ -112,13 +111,13 @@ class EntryPoint private constructor(newUiConfig: UiConfig) : JFrame() {
             this.weightx = 0.5
             this.gridy = 1
         })
-        contentPane.add(leftSide.scrollPane, GridBagConstraints().apply {
+        contentPane.add(leftSide.lazyTextPane.rootPane, GridBagConstraints().apply {
             this.fill = GridBagConstraints.BOTH
             this.weightx = 0.5
             this.weighty = 0.9
             this.gridy = 2
         })
-        contentPane.add(rightSide.scrollPane, GridBagConstraints().apply {
+        contentPane.add(rightSide.lazyTextPane.rootPane, GridBagConstraints().apply {
             this.fill = GridBagConstraints.BOTH
             this.weightx = 0.5
             this.weighty = 0.9

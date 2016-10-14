@@ -1,11 +1,13 @@
 package diff
 
+import utils.ProgressIndicator
 import utils.throwIfInterrupted
 import java.util.*
 
 class DiffAlgorithm() {
 
-    fun <T, TComparisonKey> getMatches(left: List<T>, right: List<T>, comparisonFunc: (T) -> TComparisonKey): List<Match> {
+    fun <T, TComparisonKey> getMatches(left: List<T>, right: List<T>, comparisonFunc: (T) -> TComparisonKey,
+                                       progressIndicator: ProgressIndicator = ProgressIndicator.empty): List<Match> {
 
         val leftNodesSet = left.map(comparisonFunc).toSet()
         val rightNodesSet = right.map(comparisonFunc).toSet()
@@ -28,7 +30,9 @@ class DiffAlgorithm() {
             return result
         }
 
-        val previousNodes = dijkstra(startNode, end, leftNonUnique.size + rightNonUnique.size, ::getNeighbors, { l, r -> getDistance(l, r) })
+        progressIndicator.setMax(((left.size + right.size) * ((left.size + right.size) / 2).toDouble()).toLong())
+        val previousNodes = dijkstra(startNode, end, leftNonUnique.size + rightNonUnique.size, ::getNeighbors, { l, r -> getDistance(l, r) }, progressIndicator)
+        progressIndicator.done()
         val matches = toMatches(previousNodes, startNode, end)
         return matches.map { Match(leftNonUnique[it.left].index, rightNonUnique[it.right].index) }
     }
@@ -53,7 +57,9 @@ class DiffAlgorithm() {
         return 1
     }
 
-    private fun <T> dijkstra(start: T, end: T, maxPriority: Int, getNeighbors: (T) -> List<T>, getDistance: (T, T) -> Int): HashMap<T, T> {
+    private fun <T> dijkstra(start: T, end: T, maxPriority: Int, getNeighbors: (T) -> List<T>,
+                             getDistance: (T, T) -> Int,
+                             progressIndicator: ProgressIndicator): HashMap<T, T> {
         val distances = HashMap<T, Int>()
         val previous = HashMap<T, T>()
         val visited = HashSet<T>()
@@ -62,8 +68,11 @@ class DiffAlgorithm() {
         distances[start] = 0
         var iterationCount = 0
         while (true) {
-            if (iterationCount % 10000 == 0)
+            if (iterationCount % 10000 == 0) {
                 Thread.currentThread().throwIfInterrupted()
+                progressIndicator.report(progressIndicator.value + iterationCount)
+            }
+
             val current = unvisited.dequeueMin()
             if (current == null || current == end)
                 return previous
